@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loan Calculator — @autochitect/engine</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; }
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 0 auto; padding: 2rem; color: #1f2937; }
+    h1 { margin-bottom: 0.5rem; }
+    .subtitle { color: #6b7280; margin-bottom: 2rem; }
+    .controls { display: grid; gap: 1rem; margin-bottom: 2rem; }
+    .control label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
+    .control input[type="range"] { width: 100%; }
+    .control .value { float: right; font-weight: normal; color: #2563eb; }
+    .results { background: #f8f9fa; padding: 1.5rem; border-radius: 8px; }
+    .results h2 { margin-bottom: 1rem; }
+    .line { display: flex; justify-content: space-between; padding: 0.35rem 0; }
+    .line.indent { padding-left: 1.5rem; color: #6b7280; }
+    .line.total { font-weight: bold; border-top: 2px solid #d1d5db; padding-top: 0.75rem; margin-top: 0.5rem; }
+    #graph { margin-top: 2rem; }
+    #graph h3 { margin-bottom: 0.5rem; }
+    #graph pre { background: #f1f5f9; padding: 1rem; border-radius: 6px; font-size: 0.8rem; overflow-x: auto; }
+    #loading { color: #6b7280; }
+  </style>
+</head>
+<body>
+  <h1>Loan Calculator</h1>
+  <p class="subtitle">All calculations run client-side via WebAssembly. Zero server calls.</p>
+
+  <div id="loading">Loading engine...</div>
+
+  <div id="app" style="display: none;">
+    <div class="controls">
+      <div class="control">
+        <label>Loan amount <span class="value" id="val-amount">$300,000</span></label>
+        <input type="range" id="amount" min="10000" max="1000000" step="5000" value="300000">
+      </div>
+      <div class="control">
+        <label>Annual interest rate <span class="value" id="val-rate">6.5%</span></label>
+        <input type="range" id="rate" min="1" max="20" step="0.1" value="6.5">
+      </div>
+      <div class="control">
+        <label>Loan term <span class="value" id="val-years">30 years</span></label>
+        <input type="range" id="years" min="1" max="30" step="1" value="30">
+      </div>
+    </div>
+
+    <div class="results" id="results"></div>
+
+    <div id="graph">
+      <h3>Dependency Graph</h3>
+      <pre id="graph-output"></pre>
+    </div>
+  </div>
+
+  <script type="module">
+    import { createEngine } from 'https://esm.sh/@autochitect/engine';
+
+    const model = `
+      loan_amount: Input
+      annual_rate_pct: Input
+      years: Input
+
+      monthly_rate = annual_rate_pct / 100 / 12
+      total_months = years * 12
+
+      # PMT returns a negative value (cash outflow), so negate it
+      monthly_payment = -PMT(monthly_rate, total_months, loan_amount)
+
+      total_paid = monthly_payment * total_months
+      total_interest = total_paid - loan_amount
+      interest_pct = total_interest / loan_amount * 100
+    `;
+
+    const engine = await createEngine('https://unpkg.com/@autochitect/engine/engine.wasm');
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+
+    const sliders = {
+      amount: document.getElementById('amount'),
+      rate: document.getElementById('rate'),
+      years: document.getElementById('years'),
+    };
+
+    function getInputs() {
+      return {
+        loan_amount: Number(sliders.amount.value),
+        annual_rate_pct: Number(sliders.rate.value),
+        years: Number(sliders.years.value),
+      };
+    }
+
+    function fmt(n) {
+      return typeof n === 'number'
+        ? n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
+        : '—';
+    }
+
+    function update() {
+      const inputs = getInputs();
+
+      document.getElementById('val-amount').textContent = fmt(inputs.loan_amount);
+      document.getElementById('val-rate').textContent = inputs.annual_rate_pct.toFixed(1) + '%';
+      document.getElementById('val-years').textContent = inputs.years + ' year' + (inputs.years === 1 ? '' : 's');
+
+      const result = engine.estimate(model, inputs, { graph: true });
+      const r = result.results;
+
+      document.getElementById('results').innerHTML = `
+        <h2>Repayment Summary</h2>
+        <div class="line total"><span>Monthly payment</span><span>${fmt(r.monthly_payment)}</span></div>
+        <div class="line"><span>Total paid over ${inputs.years} years</span><span>${fmt(r.total_paid)}</span></div>
+        <div class="line indent"><span>Principal</span><span>${fmt(inputs.loan_amount)}</span></div>
+        <div class="line indent"><span>Total interest</span><span>${fmt(r.total_interest)}</span></div>
+        <div class="line"><span>Interest as % of loan</span><span>${typeof r.interest_pct === 'number' ? r.interest_pct.toFixed(1) + '%' : '—'}</span></div>
+      `;
+
+      if (result.graph) {
+        const nodeMap = {};
+        result.graph.nodes.forEach(n => { nodeMap[n.id] = n.name; });
+        const lines = result.graph.edges.map(e =>
+          `${nodeMap[e.source]} → ${nodeMap[e.target]}`
+        );
+        document.getElementById('graph-output').textContent = lines.join('\n');
+      }
+    }
+
+    Object.values(sliders).forEach(s => s.addEventListener('input', update));
+    update();
+  </script>
+</body>
+</html>

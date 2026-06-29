@@ -4,7 +4,7 @@ let engine: Engine | null = null;
 
 export async function getEngine(): Promise<Engine> {
   if (!engine) {
-    engine = await createEngine("/engine.wasm");
+    engine = await createEngine("https://unpkg.com/@autochitect/engine/engine.wasm");
   }
   return engine;
 }

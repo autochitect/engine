@@ -5,7 +5,9 @@ Integration examples for `@autochitect/engine` across popular frameworks.
 | Example | Framework | Use Case |
 |---------|-----------|----------|
 | [nextjs-pricing-calculator](./nextjs-pricing-calculator/) | Next.js + TypeScript | SaaS pricing page with real-time sliders and volume discounts |
-| [vanilla-js](./vanilla-js/) | Vanilla JS (no build) | Single HTML file, zero dependencies, plain DOM |
+| [vanilla-js](./vanilla-js/) | Vanilla JS (no build) | SaaS workforce cost estimator — single HTML file, zero dependencies |
+| [loan-calculator](./loan-calculator/) | Vanilla JS (no build) | Mortgage/loan calculator using the built-in `PMT()` function |
+| [solar-roi](./solar-roi/) | Vanilla JS (no build) | Solar panel ROI — upfront cost, payback period, 25-year profit, CO₂ offset |
 
 ## How they work
 
